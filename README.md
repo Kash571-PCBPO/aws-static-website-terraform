@@ -1,1 +1,1 @@
-AWS Static Web Application with Terraform
+--- AWS Static Web Application with Terraform ---
