@@ -1,0 +1,1 @@
+AWS Static Web Application with Terraform
