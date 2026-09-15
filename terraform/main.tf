@@ -40,3 +40,84 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "website" {
         }
      }
 }
+
+# Origin Access Control (OAC)
+# the identity CloudFront uses when requesting files from s3
+resource "aws_cloudfront_origin_access_control" "website" {
+    name = "${var.projecy_name}-${var.environment}-oac"
+    description = "OAC for ${car.project_name} static website"
+    origin_access_control_origin_type = "s3"
+    signing_behavior = "always"
+    signing_protocol = "sigv4"
+}
+
+# CloudFront distribution
+# CDN (Content Delivery Network) - that serves our website files to users globally
+resource "aws_cloudfront_distribution" "website" {
+    enabled = true
+    default_root_object = "index.html"
+    comment = "${var.project_name}-${var.environment}"
+
+    origin {
+        domain_name = aws_s3_bucket.website.bucket_regional_domain_name
+        origin_id = "s3-${aws_s3_bucket.website.id}"
+        origin_access_control_id = aws_cloudfront_origin_access_control.website.id
+    }
+
+    default_cache_behavior {
+        target_origin_id = "s3-${aws_s3_bucket.website.id}"
+        viewer_protocol_policy = "redirect-to-https"
+        allowed_methods = ["GET", "HEAD"]
+        cached_methods = ["GET", "HEAD"]
+        compress = true
+
+        forwarded_values {
+            query_string = false
+            cookies {
+                forward = "none"
+            }
+        }
+    }
+
+    restrictions {
+        geo_restriction {
+            restriction_type = "none"
+        }
+    }
+
+    viewer_certificate {
+        cloudfront_default_certificate = true
+    }
+}
+
+# IAM policy doc (resource based policy)
+# Principal - CloudFront service
+# Action - s3:GetObject only (least privilege)
+# Resource - every file inside the bucket
+# Condition - ONLY requests from OUR distribution
+data "aws_iam_policy_document" "website_bucket_policy" {
+    statement {
+        sid = "AllowCloudFrontOnly"
+        effect = "Allow"
+
+        principals {
+            type = "Service"
+            identifiers = ["cloudfront.amazonaws.com"]
+        }
+
+        actions = ["s3:GetObject"]
+        resources = ["${aws_s3_bucket.website.arn}/*"]
+
+        condition {
+            test = "StringEquals"
+            variable = "AWS:SourceArn"
+            values = [aws_cloudfront_distribution.website.arn]
+        }
+    }
+}
+
+# attach the policy to the s3 bucket
+resource "aws_s3_bucket_policy" "website" {
+    bucket = aws_s3_bucket.website.id
+    policy = data.aws_iam_policy_document.website_bucket_policy.json
+}
