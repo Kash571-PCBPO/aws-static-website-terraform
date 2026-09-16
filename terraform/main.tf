@@ -44,7 +44,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "website" {
 # Origin Access Control (OAC)
 # the identity CloudFront uses when requesting files from s3
 resource "aws_cloudfront_origin_access_control" "website" {
-    name = "${var.projecy_name}-${var.environment}-oac"
+    name = "${var.project_name}-${var.environment}-oac"
     description = "OAC for ${var.project_name} static website"
     origin_access_control_origin_type = "s3"
     signing_behavior = "always"
